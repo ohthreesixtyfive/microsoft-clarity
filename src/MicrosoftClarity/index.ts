@@ -109,7 +109,6 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
 
     public getOutputs(): IOutputs {
         return {
-            CustomEvent: "",
             ClarityStatus: ClarityStatus[this.clarityStatus],
         };
     }
