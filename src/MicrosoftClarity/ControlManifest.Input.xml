@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="otsf" constructor="MicrosoftClarity" version="1.0.0" display-name-key="Microsoft Clarity" description-key="Log application insights to your Microsoft Clarity account" control-type="virtual">
+  <control namespace="otsf" constructor="MicrosoftClarity" version="1.1.0" display-name-key="Microsoft Clarity" description-key="Log application insights to your Microsoft Clarity account" control-type="virtual">
     <external-service-usage enabled="false"></external-service-usage>
 
     <!-- enables native OnSelect event to be triggered from the PCF -->
@@ -15,20 +15,22 @@
     <event name="OnTagsPosting" display-name-key="OnTagPosting" description-key="Behavior run when an session tags are successfully posted to Clarity" pfx-default-value='Trace("Session tags posted to Microsoft Clarity", TraceSeverity.Information, {Tags:_ClaritySessionTags}); With({wthSessionTagsTableSchema: Table({Key: "", Value: ""})}, ClearCollect(_ClaritySessionTags, Filter(Table(wthSessionTagsTableSchema, _ClaritySessionTags), And(!IsBlank(ThisRecord.Key), !IsBlank(ThisRecord.Value)))));' hidden="true" />
 
     <!-- output parameters -->
-    <property name="ClarityStatus" display-name-key="Clarity status" description-key="The status of the Microsoft Clarity instance" of-type="SingleLine.Text" usage="output" required="true" hidden="false" />
+    <!-- we're leveraging a usage type of 'bound' rather than 'output' so that it will be surfaced in the model-driven app component picker 
+    we're setting its hidden property to 'true' so that we do not require the end-user to provide a bound field during configuration -->
+    <property name="ClarityStatus" display-name-key="Clarity status" description-key="The status of the Microsoft Clarity instance" of-type="SingleLine.Text"  default-value="" usage="bound" required="false" hidden="true" />
 
     <!-- input parameters -->
-    <property name="ClarityProjectId" display-name-key="Clarity project id" description-key="The ID of the Clarity project used to log events and sessions" of-type="SingleLine.Text" usage="bound" required="true" hidden="false" />
-    <property name="SessionId" display-name-key="Session id" description-key="The session id to associate to this session [Default: Host.SessionID]" of-type="SingleLine.Text" pfx-default-value='Host.SessionID' usage="bound" required="false" hidden="false" />
-    <property name="ActiveScreenName" display-name-key="Active screen name" description-key="The currently active screen [Default: App.ActiveScreen.Name]" of-type="SingleLine.Text" pfx-default-value='App.ActiveScreen.Name' usage="bound" required="false" hidden="false" />
-    <property name="UserId" display-name-key="User id" description-key="The user id to associate to this session [Default: User().Email]" of-type="SingleLine.Text" pfx-default-value='User().Email' usage="bound" required="false" hidden="false" />
-    <property name="UserName" display-name-key="User name" description-key="The user name to associate to this session [Default: User().FullName]" of-type="SingleLine.Text" pfx-default-value='User().FullName' usage="bound" required="false" hidden="false" />
-    <property name="ConsentGranted" display-name-key="Consent granted" description-key="Has consent has been granted to record this session [Default: false]" of-type="TwoOptions" usage="bound" required="true" default-value="false" hidden="false" />
-    <property name="PrioritizeSession" display-name-key="Prioritize session" description-key="Prioritize this session for recording/retention [Default: false]" of-type="TwoOptions" usage="bound" required="true" default-value="false" hidden="false" />
+    <property name="ClarityProjectId" display-name-key="Clarity project id" description-key="The ID of the Clarity project used to log events and sessions" of-type="SingleLine.Text" usage="input" required="true" hidden="false" />
+    <property name="SessionId" display-name-key="Session id" description-key="The session id to associate to this session [Default: Host.SessionID]" of-type="SingleLine.Text" pfx-default-value='Host.SessionID' usage="input" required="false" hidden="false" />
+    <property name="ActiveScreenName" display-name-key="Active screen name" description-key="The currently active screen [Default: App.ActiveScreen.Name]" of-type="SingleLine.Text" pfx-default-value='App.ActiveScreen.Name' usage="input" required="false" hidden="false" />
+    <property name="UserId" display-name-key="User id" description-key="The user id to associate to this session [Default: User().Email]" of-type="SingleLine.Text" pfx-default-value='User().Email' usage="input" required="false" hidden="false" />
+    <property name="UserName" display-name-key="User name" description-key="The user name to associate to this session [Default: User().FullName]" of-type="SingleLine.Text" pfx-default-value='User().FullName' usage="input" required="false" hidden="false" />
+    <property name="ConsentGranted" display-name-key="Consent granted" description-key="Has consent has been granted to record this session [Default: false]" of-type="TwoOptions" usage="input" required="true" default-value="false" hidden="false" />
+    <property name="PrioritizeSession" display-name-key="Prioritize session" description-key="Prioritize this session for recording/retention [Default: false]" of-type="TwoOptions" usage="input" required="true" default-value="false" hidden="false" />
 
     <!-- hidden/internal input properties -->
-    <property name="CustomEvent" display-name-key="Custom event" description-key="A custom event message to tag to this session" of-type="SingleLine.Text" pfx-default-value='_ClarityEventMessage' usage="bound" required="true" hidden="true" />
-    <property name="CustomTags" display-name-key="Custom session tags" description-key="A set of custom tags to add to this session" of-type="Multiple" pfx-default-value='JSON(Filter(_ClaritySessionTags, And(!IsBlank(ThisRecord.Key), !IsBlank(ThisRecord.Value))))' usage="bound" required="false" hidden="true" />
+    <property name="CustomEvent" display-name-key="Custom event" description-key="A custom event message to tag to this session" of-type="SingleLine.Text" pfx-default-value='_ClarityEventMessage' default-value="" usage="input" required="false" hidden="true" />
+    <property name="CustomTags" display-name-key="Custom session tags" description-key="A set of custom tags to add to this session" of-type="Multiple" pfx-default-value='JSON(Filter(_ClaritySessionTags, And(!IsBlank(ThisRecord.Key), !IsBlank(ThisRecord.Value))))' default-value="" usage="input" required="false" hidden="true" />
 
     <resources>
       <code path="index.ts" order="1"/>
