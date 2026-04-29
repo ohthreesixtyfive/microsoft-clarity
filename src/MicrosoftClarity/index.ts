@@ -53,6 +53,16 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
         if (newConsentProvided !== this.consentProvided || newProjectId !== this.currentProjectId) {
             if (newConsentProvided) {
                 this.initializeClarity(newProjectId as string);
+            } else if (this.consentProvided && !newConsentProvided) {
+                /* consent has been revoked — notify Clarity and reset status */
+                try {
+                    Clarity.consent(false);
+                } catch (error) {
+                    console.error("Clarity consent revocation failed:", error);
+                }
+                this.updateClarityStatus(ClarityStatus.NotStarted);
+                this.currentProjectId = null;
+                this.sessionPrioritized = false;
             }
             this.consentProvided = newConsentProvided;
             this.dispatchNotifyOutputChanged = true;
@@ -61,7 +71,11 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
         /* check and prioritize session if it has been called for and hasn't already been prioritized */
         const newSessionPrioritized = context.parameters.PrioritizeSession.raw;
         if (newSessionPrioritized !== this.sessionPrioritized && newSessionPrioritized) {
-            Clarity.upgrade("");
+            try {
+                Clarity.upgrade("prioritized");
+            } catch (error) {
+                console.error("Clarity upgrade failed:", error);
+            }
             this.sessionPrioritized = newSessionPrioritized;
             this.dispatchNotifyOutputChanged = true;
         }
@@ -81,14 +95,14 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
         /* check if a new event message has been provided and post it if it is valid */
         const newEventMessage = context.parameters.CustomEvent.raw || "";
         if (this.isValidInput(newEventMessage, "Event message")) {
-            this.postEvent(context, newEventMessage);
+            this.postEvent(newEventMessage);
             this.dispatchNotifyOutputChanged = true;
         }
 
         /* check if new custom tags have been provided and post them if they are valid */
         const newCustomTags = context.parameters.CustomTags.raw || "";
         if (this.isValidJsonTags(newCustomTags)) {
-            this.postTags(context, JSON.parse(newCustomTags));
+            this.postTags(JSON.parse(newCustomTags));
             this.dispatchNotifyOutputChanged = true;
         }
 
@@ -121,10 +135,25 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
             return;
         }
 
+        /* check if the environment supports the browser APIs that Clarity requires
+           (e.g. the Power Apps mobile app uses a native renderer without a full DOM) */
+        if (typeof document === "undefined" ||
+            typeof window === "undefined" ||
+            !window.MutationObserver ||
+            !document.createTreeWalker) {
+            this.updateClarityStatus(ClarityStatus.Unsupported);
+            return;
+        }
+
         /* check if Clarity has already been initialized with the same project id */
         if (projectId === this.currentProjectId && this.clarityStatus === ClarityStatus.Initialized) {
             return;
         }
+
+        /* inline external stylesheets before Clarity captures the DOM so that
+           session replay has access to the actual CSS content rather than relying
+           on re-fetching <link> hrefs that may be session-bound or expired */
+        this.inlineExternalStylesheets();
 
         /* initialize and consent to Clarity with the provided project id */
         try {
@@ -134,6 +163,40 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
             this.updateClarityStatus(ClarityStatus.Initialized);
         } catch (error) {
             this.updateClarityStatus(ClarityStatus.Error);
+        }
+    }
+
+    private inlineExternalStylesheets(): void {
+        /* Replicate the approach Clarity uses for Electron: convert <link rel="stylesheet">
+           elements to <style> tags with inlined cssRules. This ensures Clarity captures the
+           CSS content in the DOM snapshot instead of recording a URL reference that may be
+           inaccessible (session-bound, expired, or CORS-restricted) at replay time.
+           Cross-origin stylesheets that throw SecurityError are left as-is. */
+        try {
+            const links = document.querySelectorAll('link[rel="stylesheet"]');
+            links.forEach((link) => {
+                try {
+                    const sheet = (link as HTMLLinkElement).sheet as CSSStyleSheet;
+                    if (!sheet || !sheet.cssRules) { return; }
+                    let css = "";
+                    for (let i = 0; i < sheet.cssRules.length; i++) {
+                        css += sheet.cssRules[i].cssText + "\n";
+                    }
+                    if (css.length > 0) {
+                        const style = document.createElement("style");
+                        style.textContent = css;
+                        link.parentNode?.replaceChild(style, link);
+                    }
+                } catch (e: any) {
+                    /* SecurityError = cross-origin stylesheet we cannot read; leave the <link> intact */
+                    if (e?.name !== "SecurityError") {
+                        console.warn("Failed to inline stylesheet:", e);
+                    }
+                }
+            });
+        } catch (e) {
+            /* non-critical — if this fails entirely, Clarity still works with URL references */
+            console.warn("Failed to inline external stylesheets:", e);
         }
     }
 
@@ -158,7 +221,7 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
         }
     }    
 
-    private postEvent(context: ComponentFramework.Context<IInputs>, eventMessage: string): void {
+    private postEvent(eventMessage: string): void {
         /* check if Clarity has been initialized */
         if (this.clarityStatus !== ClarityStatus.Initialized) {
             return;
@@ -178,7 +241,7 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
         }
     }
 
-    private postTags(context: ComponentFramework.Context<IInputs>, tags: any[]): void {
+    private postTags(tags: any[]): void {
         /* check if Clarity has been initialized */
         if (this.clarityStatus !== ClarityStatus.Initialized) {
             return;
@@ -211,6 +274,8 @@ export class MicrosoftClarity implements ComponentFramework.ReactControl<IInputs
     }
 
     private isValidInput(value: string | undefined | null, type: string): boolean {
+        /* "val" is the PCF framework's default placeholder for unset input properties —
+           treat it the same as empty/null to avoid processing uninitialized inputs */
         if (!value || value.trim() === "" || value === "val") {
             return false;
         }

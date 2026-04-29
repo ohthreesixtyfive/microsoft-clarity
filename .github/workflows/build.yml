@@ -92,6 +92,7 @@ jobs:
           }
 
     - name: Install pac
+      if: steps.get_version.outputs.changed == 'true' || github.event.inputs.forceRebuild == 'true'
       uses: microsoft/powerplatform-actions/actions-install@v1
       with:
         add-tools-to-path: true
@@ -158,6 +159,7 @@ jobs:
       working-directory: "./${{ matrix.changeScope}}/${{ matrix.solutionSubFolder}}"
     
     - name: Publish Artifacts
+      if: steps.get_version.outputs.changed == 'true' || github.event.inputs.forceRebuild == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: build-artifacts-${{ matrix.solutionName }}
@@ -168,7 +170,7 @@ jobs:
       if: github.event_name != 'pull_request' && (steps.get_version.outputs.changed == 'true' || github.event.inputs.forceRebuild == 'true')
       id: get_artifacts
       run: |
-        $files = Get-ChildItem -Path "./${{ matrix.changeScope }}/data" -Filter "*data.zip" -Recurse | ForEach-Object { $_.FullName }
+        $files = Get-ChildItem -Path "./${{ matrix.changeScope }}/data" -Filter "*data.zip" -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
         if ($null -eq $files) {
           $files = @()  # Initialize as an empty array if it is null
         }

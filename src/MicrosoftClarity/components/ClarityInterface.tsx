@@ -16,6 +16,7 @@ export enum ClarityStatus {
   NotStarted,
   Initializing,
   Initialized,
+  Unsupported,
   Error,
 }
 
@@ -44,6 +45,8 @@ export const ClarityInterface: React.FC<IClarityInterfaceProps> = ({ onSelect, c
         return { text: "Initializing..." };
       case ClarityStatus.Initialized:
         return { text: "Initialized" };
+      case ClarityStatus.Unsupported:
+        return { text: "Unsupported" };
       case ClarityStatus.Error:
         return { text: "Error" };
       default:
